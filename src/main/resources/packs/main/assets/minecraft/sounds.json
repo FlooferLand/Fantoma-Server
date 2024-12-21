@@ -1,0 +1,14 @@
+{
+    "entity.baldi.slap": {
+        "sounds": [
+            "baldi/slap"
+        ],
+        "subtitle": "subtitles.entity.baldi.slap"
+    },
+    "silly.vineboom": {
+        "sounds": [
+            "baldi/slap"
+        ],
+        "subtitle": "subtitles.entity.baldi.slap"
+    }
+}
