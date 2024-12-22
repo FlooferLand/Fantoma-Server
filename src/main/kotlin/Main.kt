@@ -2,6 +2,7 @@ import commands.SaveWorldCommand
 import commands.VineBoomCommand
 import dev.emortal.nbstom.NBS
 import dev.lu15.voicechat.VoiceChat
+import handlers.DoorBlockHandler
 import net.kyori.adventure.resource.ResourcePackInfo
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
@@ -14,7 +15,6 @@ import net.minestom.server.entity.Player
 import net.minestom.server.event.Event
 import net.minestom.server.event.EventFilter
 import net.minestom.server.event.EventNode
-import net.minestom.server.event.instance.InstanceUnregisterEvent
 import net.minestom.server.event.item.ItemDropEvent
 import net.minestom.server.event.item.PickupItemEvent
 import net.minestom.server.event.player.AsyncPlayerConfigurationEvent
@@ -33,8 +33,10 @@ import java.time.Duration
 import java.util.*
 import kotlinx.coroutines.future.await
 import net.minestom.server.extras.velocity.VelocityProxy
-import net.minestom.server.world.DimensionType
-import org.slf4j.Logger
+import extensions.*
+import net.minestom.server.entity.Entity
+import net.minestom.server.event.instance.InstanceTickEvent
+import net.minestom.server.event.player.PlayerBlockPlaceEvent
 import org.slf4j.LoggerFactory
 
 val serverInfo = ServerInfo("0.0.0.0", 25568)
@@ -71,8 +73,6 @@ suspend fun main(args: Array<String>) {
     instance.setGenerator { unit ->
         unit.modifier().fillHeight(0, 40, Block.GRASS_BLOCK)
     }
-    instance.setBlock(0, 41, 6, Block.OAK_DOOR.withProperty("half", "upper"))
-    instance.setBlock(0, 40, 6, Block.OAK_DOOR.withProperty("half", "lower"))
     
     // Lighting
     instance.setChunkSupplier(::LightingChunk)
@@ -110,6 +110,13 @@ suspend fun main(args: Array<String>) {
         MojangAuth.init()
     }
     server.start("0.0.0.0", serverInfo.port)
+}
+
+fun registerNewBlock(block: Block) : Block {
+    return when (block) {
+        Block.OAK_DOOR -> block.withHandler(DoorBlockHandler())
+        else -> block
+    }
 }
 
 fun registerMiscEvents(instance: InstanceContainer, handler: EventNode<Event>) {
@@ -150,7 +157,11 @@ fun registerPlayerEvents(instance: InstanceContainer, handler: EventNode<PlayerE
         Sidebar(Component.text("-- Fantoma --"))
             .createLine(Sidebar.ScoreboardLine("line_0", Component.text("Welcome ${player.name}!"), 0))
 
+        // Doors
+        event.instance.setBlock(0, 40, 5, registerNewBlock(Block.OAK_DOOR))
+
         // Music
+        // TODO: Make an original track list in NBS for the public release
         // TODO: Make it global, so the entire server plays the same song at the same time
         val songList = arrayOf(
             "Stayed gone by michalkmiecinski544",
@@ -164,8 +175,12 @@ fun registerPlayerEvents(instance: InstanceContainer, handler: EventNode<PlayerE
     }
 
     // On block break
+    handler.addListener(PlayerBlockPlaceEvent::class.java) { event ->
+        instance.setBlock(event.blockPosition.up(), registerNewBlock(event.block))
+    }
+
+    // On block break
     handler.addListener(PlayerBlockBreakEvent::class.java) { event ->
-        val player = event.player
         val material = event.block.registry().material()
         if (material != null) {
             val itemStack = ItemStack.of(material)
@@ -174,7 +189,7 @@ fun registerPlayerEvents(instance: InstanceContainer, handler: EventNode<PlayerE
             entity.setPickupDelay(Duration.ofMillis(50))
         }
     }
-    
+
     // On item drop
     handler.addListener(ItemDropEvent::class.java) { event ->
         val entity = ItemEntity(event.itemStack)
